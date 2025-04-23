@@ -43,6 +43,9 @@ class _MainScreenState extends State<MainScreen> {
   BluetoothDevice? _connectedDevice;
   bool _isConnected = false;
   String _statusMessage = 'Waiting for data...';
+  String? _deviceName;
+  List<ScanResult> _availableDevices = [];
+  bool _isScanning = false;
 
   @override
   void initState() {
@@ -59,16 +62,22 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _startBluetoothScan() {
-    FlutterBluePlus.scanResults.listen((results) {
-      for (ScanResult result in results) {
-        if (result.device.name.contains('HC-06')) {
-          _connectToDevice(result.device);
-          break;
-        }
-      }
+    setState(() {
+      _isScanning = true;
+      _availableDevices = [];
     });
 
-    FlutterBluePlus.startScan(timeout: const Duration(seconds: 4));
+    FlutterBluePlus.scanResults.listen((results) {
+      setState(() {
+        _availableDevices = results;
+      });
+    });
+
+    FlutterBluePlus.startScan(timeout: const Duration(seconds: 4)).then((_) {
+      setState(() {
+        _isScanning = false;
+      });
+    });
   }
 
   Future<void> _connectToDevice(BluetoothDevice device) async {
@@ -77,6 +86,7 @@ class _MainScreenState extends State<MainScreen> {
       setState(() {
         _connectedDevice = device;
         _isConnected = true;
+        _deviceName = device.name;
         _statusMessage = 'Connected to ${device.name}';
       });
       _listenForData(device);
@@ -116,13 +126,103 @@ class _MainScreenState extends State<MainScreen> {
       appBar: AppBar(
         title: const Text('Fall Detection System'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _isScanning ? null : _startBluetoothScan,
+          ),
+        ],
       ),
       body:
           _selectedIndex == 0
-              ? HomeScreen(
-                receivedData: _receivedData,
-                isConnected: _isConnected,
-                statusMessage: _statusMessage,
+              ? Column(
+                children: [
+                  Expanded(
+                    child: HomeScreen(
+                      receivedData: _receivedData,
+                      isConnected: _isConnected,
+                      statusMessage: _statusMessage,
+                      deviceName: _deviceName,
+                    ),
+                  ),
+                  Container(
+                    height: 300,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Available Devices',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (_isScanning)
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child:
+                              _availableDevices.isEmpty
+                                  ? Center(
+                                    child: Text(
+                                      _isScanning
+                                          ? 'Scanning for devices...'
+                                          : 'No devices found',
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  )
+                                  : ListView.builder(
+                                    itemCount: _availableDevices.length,
+                                    itemBuilder: (context, index) {
+                                      final device =
+                                          _availableDevices[index].device;
+                                      return Card(
+                                        margin: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        child: ListTile(
+                                          title: Text(
+                                            device.name.isNotEmpty
+                                                ? device.name
+                                                : 'Unknown Device',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          subtitle: Text(
+                                            device.remoteId.toString(),
+                                          ),
+                                          trailing: ElevatedButton(
+                                            onPressed:
+                                                () => _connectToDevice(device),
+                                            child: const Text('Connect'),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               )
               : _selectedIndex == 1
               ? const EmergencyContactsScreen()

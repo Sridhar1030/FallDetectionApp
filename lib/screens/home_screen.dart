@@ -5,12 +5,14 @@ class HomeScreen extends StatefulWidget {
   final List<String> receivedData;
   final bool isConnected;
   final String statusMessage;
+  final String? deviceName;
 
   const HomeScreen({
     super.key,
     required this.receivedData,
     required this.isConnected,
     required this.statusMessage,
+    this.deviceName,
   });
 
   @override
@@ -46,6 +48,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Device Status: ${widget.isConnected ? "Connected" : "Disconnected"}',
                   style: const TextStyle(fontSize: 18),
                 ),
+                const SizedBox(height: 10),
+                if (widget.deviceName != null && widget.isConnected)
+                  Text(
+                    'Connected Device: ${widget.deviceName}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 const SizedBox(height: 10),
                 Text(
                   widget.statusMessage,
